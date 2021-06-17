@@ -1,14 +1,14 @@
 program main
    use  m_unify_zmat
    implicit none
-   integer, parameter :: N= 1000, lwork = 3*N
+   integer, parameter :: N= 200, lwork = 3*N
    real(kind=8)       :: H(N,N), vecs1(N,N), vecs2(N,N), eig1(N), eig2(N), work(lwork)
    integer :: info, i
    
    ! Hermitian matrix with a few degenerate values
    H = 0.0
-   do i = 1,(N/2)+1
-      H(i,N-i+1) = ceiling(i/2.0)
+   do i = 1,N
+      H(i,N-i+1) = floor(sqrt(1.0*i))
    enddo 
 
    ! hermitianize
@@ -35,4 +35,27 @@ program main
    !write (*,*) "Eigenvalues:", eig1
    write (*,*) "Eigenvector diff norm:", norm2(vecs1 - vecs2) 
    write (*,*) "Eigenvector maxdiff:", maxval(abs(vecs1 - vecs2))
+
+   call investigate(eig1, vecs1, vecs2)
+
+contains
+   subroutine investigate(eigval, eigvec1, eigvec2)
+      implicit none 
+      real(kind=8), intent(in) :: eigval(:), eigvec1(:,:), eigvec2(:,:)
+      integer :: beg_group, end_group, n_g
+      integer, allocatable :: groups(:)
+      integer :: deg
+
+      groups = make_groups(eigval)
+   
+
+      write (*,*) "degeneracy    eigenvalue             norm diff"
+      do n_g = 1, size(groups)
+         beg_group = sum(groups(1:n_g-1)) + 1
+         end_group = sum(groups(1:n_g))
+
+         deg = end_group - beg_group + 1
+         write (*,*) deg, eigval(beg_group), norm2(eigvec1(:,beg_group:end_group) - eigvec2(:,beg_group:end_group))
+      enddo 
+   end subroutine investigate
 end program main
