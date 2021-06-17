@@ -1,7 +1,7 @@
 program main
    use  m_unify_zmat
    implicit none
-   integer, parameter :: N= 200, lwork = 3*N
+   integer, parameter :: N= 150, lwork = 3*N
    real(kind=8)       :: H(N,N), vecs1(N,N), vecs2(N,N), eig1(N), eig2(N), work(lwork)
    integer :: info, i
    
