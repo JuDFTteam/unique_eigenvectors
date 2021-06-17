@@ -12,8 +12,9 @@ bash-4.4$ ifort  -mkl unify_zmat.f90  example.f90 && ./a.out
  Before:
  Eigenvalue diff norm:  0.000000000000000E+000
  Eigenvector diff norm:   46.3896540189728     
+ Eigenvector maxdiff:   1.41421356237309     
  
-After:
+ After:
  Eigenvector diff norm:  1.387677879323193E-011
  Eigenvector maxdiff:  9.701184300325849E-012
 ```

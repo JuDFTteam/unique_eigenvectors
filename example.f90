@@ -26,11 +26,12 @@ program main
    write (*,*) "Before:"
    write (*,*) "Eigenvalue diff norm:", norm2(eig1  - eig2)
    write (*,*) "Eigenvector diff norm:", norm2(vecs1 - vecs2) 
+   write (*,*) "Eigenvector maxdiff:", maxval(abs(vecs1 - vecs2))
 
    call unify_zmat(eig1, vecs1)
    call unify_zmat(eig2, vecs2)
 
-   write (*,*) new_line("a") // "After:"
+   write (*,*) new_line("a") // " After:"
    !write (*,*) "Eigenvalues:", eig1
    write (*,*) "Eigenvector diff norm:", norm2(vecs1 - vecs2) 
    write (*,*) "Eigenvector maxdiff:", maxval(abs(vecs1 - vecs2))
