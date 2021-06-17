@@ -5,12 +5,13 @@ program main
    real(kind=8)       :: H(N,N), vecs1(N,N), vecs2(N,N), eig1(N), eig2(N), work(lwork)
    integer :: info, i
    
-   !make initialize a random seed
+   ! Hermitian matrix with a few degenerate values
    H = 0.0
    do i = 1,(N/2)+1
       H(i,N-i+1) = ceiling(i/2.0)
    enddo 
 
+   ! hermitianize
    H = 0.5*H +  0.5*transpose(H)
 
    vecs1 = H 
@@ -30,7 +31,7 @@ program main
    call unify_zmat(eig2, vecs2)
 
    write (*,*) new_line("a") // "After:"
-   write (*,*) "Eigenvalues:", eig1
+   !write (*,*) "Eigenvalues:", eig1
    write (*,*) "Eigenvector diff norm:", norm2(vecs1 - vecs2) 
    write (*,*) "Eigenvector maxdiff:", maxval(abs(vecs1 - vecs2))
 end program main
