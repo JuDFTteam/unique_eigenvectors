@@ -1,9 +1,11 @@
 module m_unify_zmat
 contains
    subroutine unify_zmat(eigval, z)
+      use omp_lib
       implicit none
       real(kind=8), intent(in) :: eigval(:)
       real(kind=8)          :: z(:,:)
+
 
       integer :: beg_group, end_group, n_g
       integer, allocatable :: groups(:)
@@ -14,11 +16,123 @@ contains
          beg_group = sum(groups(1:n_g-1)) + 1
          end_group = sum(groups(1:n_g))
 
-         if(end_group <= size(z,2)) call unify_group(beg_group, end_group, z)
+         if(end_group <= size(z,2))then 
+            call unify_group_operator(beg_group, end_group, z)
+         endif
       enddo
    end subroutine unify_zmat
 
-   subroutine unify_group(beg_group, end_group, z)
+   subroutine rq_decomp(mat, r, q, perm_mat)
+      implicit none 
+      real(kind=8), intent(inout) :: mat(:,:), r(:,:), q(:,:), perm_mat(:,:) 
+      integer      :: dim, lwork, i,j, info, jpvt(size(mat,1))
+      real(kind=8) :: tau(size(mat,1)), work(size(mat,1)*3), tmp(size(mat,1), size(mat,2))
+
+      dim   = size(mat,1)
+      lwork =size(mat,1)*3
+      jpvt  = 0
+      if(any(shape(mat) /= shape(r)) .or. any(shape(r) /= shape(mat))) then
+         write (*,*) "need square matricies"
+      endif
+
+      tmp = transpose(mat)
+
+      call dgeqpf(dim, dim, tmp, dim, jpvt, tau, work, info)
+      if(info /= 0) write (*,*) "qr failed"
+
+      r = tmp
+      do i = 1,dim
+         do j = i+1,3 
+            r(j,i) = 0.0
+         enddo
+      enddo
+ 
+      q = tmp 
+      do i =1,3 
+         do j=i,3 
+            q(i,j) = 0.0
+         enddo
+      enddo
+
+      call dorgqr(dim, dim, dim, Q, dim, tau, work, lwork, info)
+      if(info /= 0) write (*,*) "q build failed"
+
+      write (*,*) "jpvt", jpvt
+
+
+      perm_mat = permutation_matrix(jpvt)
+      Q = transpose(Q)
+      R = transpose(R)
+
+   end subroutine rq_decomp 
+
+   function permutation_matrix(jpvt) result(p)
+      implicit none 
+      integer, intent(in) :: jpvt(:)
+      real(kind=8)        :: p(size(jpvt),size(jpvt))
+      integer :: i
+
+      p = 0.0 
+
+      do i = 1,size(jpvt)
+         p(jpvt(i), i) = 1
+      enddo
+   end function permutation_matrix
+
+   subroutine unify_group_operator(beg_group, end_group, z)
+      implicit none
+      integer, intent(in)         :: beg_group, end_group
+      real(kind=8), intent(inout) :: z(:,:) 
+      real(kind=8), allocatable   :: mtx(:,:), eigval(:), work(:), rq_mat(:,:), tau(:), R(:,:), Q(:,:), tmp(:,:)
+      integer :: dim, lwork, info, i, j
+      real(kind=8) :: work_size(1)
+      real(kind=8), parameter :: zero = 0.0, one = 1.0
+
+      dim = end_group - beg_group + 1 
+      allocate(rq_mat(dim, dim), tau(dim), R(dim,dim), Q(dim,dim))
+      call make_rq_mat(z(:,beg_group:end_group), rq_mat)
+      
+      rq_mat = transpose(rq_mat)
+
+      call dgeqrfp(dim, dim, rq_mat, dim, tau, work_size, -1, info)
+      if(info /= 0) write (*,*) "problem A"
+      lwork = int(work_size(1))
+      allocate(work(lwork))
+      call dgeqrfp(dim, dim, rq_mat, dim, tau, work, lwork, info)
+      if(info /= 0) write (*,*) "problem B"
+
+      deallocate(work)
+
+      q = rq_mat
+      r = rq_mat
+
+      do i = 1,dim
+         do j = i+1,dim
+            r(j,i) = 0.0
+         enddo
+      enddo
+ 
+      do i =1,3 
+         do j=i,dim
+            q(i,j) = 0.0
+         enddo
+      enddo
+
+
+      call dorgqr(dim, dim, dim, Q, dim, tau, work_size, -1, info)
+      if(info /= 0) write (*,*) "problem C"
+      lwork = int(work_size(1))
+      allocate(work(lwork))
+      call dorgqr(dim, dim, dim, Q, dim, tau, work, lwork, info)
+      if(info /= 0) write (*,*) "problem D"
+
+      tmp = z(:,beg_group:end_group)
+      ! z(:,beg_group:end_group) = matmul(z(:,beg_group:end_group), q)
+      call dgemm("N", "N", size(z,1), dim, dim, one, tmp, size(z,1), q, dim, zero, z(:,beg_group:end_group), size(z,1))
+
+   end subroutine unify_group_operator
+
+   subroutine unify_group_lsq(beg_group, end_group, z)
       implicit none
       integer, intent(in)    :: beg_group, end_group
       real(kind=8), intent(inout) :: z(:,:) 
@@ -42,10 +156,10 @@ contains
       !new_basis = matmul(lhs, solution)
       call dgemm("N", "N", basis_sz, nrhs, nrhs, one, lhs, size(lhs,1), solution, size(solution,1), &
             zero, new_basis, size(new_basis,1))
-      call mod_gram_schmidt(new_basis)
+      !call mod_gram_schmidt(new_basis)
 
       z(:,beg_group:end_group) = new_basis
-   end subroutine unify_group
+   end subroutine unify_group_lsq
 
    subroutine leastsq(lhs, targ, solution)
       implicit none 
@@ -157,4 +271,78 @@ contains
          groups(i) = count(i == color)
       enddo 
    end function make_groups
+
+   subroutine make_rq_mat(eigvecs, rq_mat)
+      implicit none
+      real(kind=8), intent(in)                 :: eigvecs(:,:)
+      real(kind=8), intent(inout), allocatable :: rq_mat(:,:)
+      integer :: n, i, j
+      real(kind=8) :: cutoff, lindep
+      real(kind=8), allocatable :: tmp(:,:)
+
+      n = size(eigvecs,2)
+      cutoff = 0.9 * sqrt(1.0/size(eigvecs,1))
+      if(allocated(rq_mat)) deallocate(rq_mat)
+      allocate(rq_mat(n,n), tmp(n,n))
+
+      rq_mat = 0.0
+      lindep = 0.0  
+      
+      do i = 1,n 
+         if(allocated(tmp)) deallocate(tmp)
+         allocate(tmp(i,n))
+         tmp = 0.0
+         lindep = 0.0
+
+         j = 0
+         do while(lindep < cutoff)
+            j = j + 1
+            if(j > size(eigvecs,1)) then
+               write (*,*) "problem with make_rq_mat"
+            endif
+            
+            rq_mat(i,:) = eigvecs(j,:)
+            tmp = rq_mat(1:i,:)
+            lindep = linear_independency(tmp)
+         enddo
+      enddo
+   end subroutine make_rq_mat
+
+   function linear_independency(mat)
+      implicit none
+      real(kind=8), intent(inout) :: mat(:,:)
+      real(kind=8) :: linear_independency
+      
+      integer :: info, lwork, iwork(8*minval(shape(mat))), ldmat, m, n
+      integer, parameter :: ldu = 1, ldvt = 1
+
+      real(kind=8) :: s(minval(shape(mat))), u(1,1), vt(1,1), work_size(1)
+      real(kind=8), allocatable :: work(:)
+
+      ldmat = size(mat, 1)
+      m = size(mat,1)
+      n = size(mat,2)
+
+      !call dgesdd(jobz,m,n, a,   lda, s, u, ldu, vt, ldvt, work,lwork, iwork, info)
+      call dgesdd("N", m, n, mat, ldmat, s, u, ldu, vt, ldvt, work_size, -1, iwork, info)
+      
+      lwork = int(work_size(1))
+      allocate(work(lwork))
+
+      call dgesdd("N", m, n, mat, ldmat, s, u, ldu, vt, ldvt, work, lwork, iwork, info)
+
+      linear_independency = s(size(s))
+   end function linear_independency
+
+
+   subroutine print_mtx(mtx)
+      implicit none 
+      real(kind=8), intent(in) :: mtx(:,:)
+      integer ::i
+
+      do i = 1, size(mtx,1) 
+         write (*,*) mtx(i,:)
+      enddo
+      write (*,*) "####"
+   end subroutine print_mtx 
 end module m_unify_zmat
