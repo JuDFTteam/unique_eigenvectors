@@ -1,6 +1,6 @@
-module m_unify_zmat
+module m_unique_eigvec
 contains
-   subroutine unify_zmat(eigval, z, ierr)
+   subroutine unique_eigvec(eigval, z, ierr)
       use omp_lib
       implicit none
       real(kind=8), intent(in) :: eigval(:)
@@ -21,7 +21,7 @@ contains
             call unify_group_operator(beg_group, end_group, z, ierr)
          endif
       enddo
-   end subroutine unify_zmat
+   end subroutine unique_eigvec
 
    subroutine unify_group_operator(beg_group, end_group, z, ierr)
       implicit none
@@ -209,4 +209,4 @@ contains
       enddo
       write (*,*) "####"
    end subroutine print_mtx 
-end module m_unify_zmat
+end module m_unique_eigvec

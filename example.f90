@@ -1,5 +1,5 @@
 program main
-   use  m_unify_zmat
+   use  m_unique_eigvec
    implicit none
    integer, parameter :: N=70, lwork = 3*N
    real(kind=8), allocatable :: H(:,:), vecs1(:,:), vecs2(:,:), eig1(:), eig2(:), work(:)
@@ -31,9 +31,9 @@ program main
    write (*,*) "Eigenvector diff norm:", norm2(vecs1 - vecs2) 
    write (*,*) "Eigenvector maxdiff:", maxval(abs(vecs1 - vecs2))
 
-   call unify_zmat(eig1, vecs1, ierr)
+   call unique_eigvec(eig1, vecs1, ierr)
    if(ierr /= 0) stop
-   call unify_zmat(eig2, vecs2, ierr)
+   call unique_eigvec(eig2, vecs2, ierr)
    if(ierr /= 0) stop
 
    write (*,*) new_line("a") // " After:"
