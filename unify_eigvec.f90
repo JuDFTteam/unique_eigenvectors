@@ -1,4 +1,7 @@
 module m_unique_eigvec
+   interface linear_independency
+      module procedure linear_independency_cmplx, linear_independency_real
+   end interface linear_independency
 contains
    subroutine unique_eigvec(eigval, z, ierr)
       use omp_lib
@@ -172,10 +175,10 @@ contains
       endif
    end subroutine make_rq_mat
 
-   function linear_independency(mat)
+   function linear_independency_real(mat)
       implicit none
       real(kind=8), intent(inout) :: mat(:,:)
-      real(kind=8) :: linear_independency
+      real(kind=8) :: linear_independency_real
       
       integer :: info, lwork, iwork(8*minval(shape(mat))), ldmat, m, n
       integer, parameter :: ldu = 1, ldvt = 1
@@ -195,8 +198,35 @@ contains
 
       call dgesdd("N", m, n, mat, ldmat, s, u, ldu, vt, ldvt, work, lwork, iwork, info)
 
-      linear_independency = s(size(s))
-   end function linear_independency
+      linear_independency_real = s(size(s))
+   end function linear_independency_real
+
+   function linear_independency_cmplx(mat)
+      implicit none
+      complex(kind=8), intent(inout) :: mat(:,:)
+      real(kind=8) :: linear_independency_cmplx
+      
+      integer :: info, lwork, iwork(8*minval(shape(mat))), ldmat, m, n
+      integer, parameter :: ldu = 1, ldvt = 1
+
+      real(kind=8) :: s(minval(shape(mat))), rwork(7*minval(shape(mat)))
+      complex(kind=8) :: u(1,1), vt(1,1), work_size(1)
+      complex(kind=8), allocatable :: work(:)
+
+      ldmat = size(mat, 1)
+      m = size(mat,1)
+      n = size(mat,2)
+
+      !call zgesdd(jobz, m, n, a,  lda,  s, u, ldu, vt, ldvt, work,    lwork, rwork, iwork, info )
+      call zgesdd("N", m, n, mat, ldmat, s, u, ldu, vt, ldvt, work_size, -1, rwork, iwork, info)
+      
+      lwork = int(work_size(1))
+      allocate(work(lwork))
+
+      call zgesdd("N", m, n, mat, ldmat, s, u, ldu, vt, ldvt, work, lwork, rwork, iwork, info)
+
+      linear_independency_cmplx = s(size(s))
+   end function linear_independency_cmplx
 
 
    subroutine print_mtx(mtx)
